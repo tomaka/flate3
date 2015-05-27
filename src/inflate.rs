@@ -244,34 +244,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]       // FIXME: 
-    fn compressed_dynamic_block() {
-        let data = vec![0xBD, 0x48, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0x57,
-                        0x28, 0xEF, 0xBF, 0xBD, 0x2F, 0xEF, 0xBF, 0xBD, 0x49, 0x01, 0xEF, 0xBF,
-                        0xBD];
-        let data = Cursor::new(data);
-
-        let mut inflater = Inflater::new(data);
-
-        let mut output = Vec::new();
-        inflater.read_to_end(&mut output).unwrap();
-        assert_eq!(output, b"hello world");
-    }
-
-    #[test]
-    #[ignore]       // FIXME: 
-    fn compressed_fixed_block() {
-        let data = vec![0x2B, 0x49, 0x2D, 0x2E, 0x01];
-        let data = Cursor::new(data);
-
-        let mut inflater = Inflater::new(data);
-
-        let mut output = Vec::new();
-        inflater.read_to_end(&mut output).unwrap();
-        assert_eq!(output, b"test");
-    }
-
-    #[test]
     fn compressed_fixed_block_distance() {
         let data = vec![0x73, 0x49, 0x4d, 0xcb, 0x49, 0x2c, 0x49, 0x55, 0x00, 0x11, 0x00];
         let data = Cursor::new(data);
