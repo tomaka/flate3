@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Cursor};
 use bit::BitRead;
 use huffman::HuffmanTable;
 
@@ -18,7 +18,7 @@ enum LitLenSymbol {
 }
 
 impl<R> CompressedBlockReader<R> where R: Read {
-    /// Reads dynamic tables from the input stream and builds a read for this block.
+    /// Reads dynamic tables from the input stream and builds a reader for this block.
     pub fn from_dynamic_tables(mut inner: BitRead<R>) -> io::Result<CompressedBlockReader<R>> {
         let (lit_len_table, dist_table) = try!(read_dynamic_tables(&mut inner));
 
@@ -30,21 +30,62 @@ impl<R> CompressedBlockReader<R> where R: Read {
         })
     }
 
-    pub fn new(inner: BitRead<R>) -> CompressedBlockReader<R> {
-        unimplemented!();
-        /*CompressedBlockReader {
+    /// Builds a reader for this block that uses fixed huffman tables.
+    pub fn from_fixed_tables(inner: BitRead<R>) -> CompressedBlockReader<R> {
+        let lit_len_table = HuffmanTable::from_lengths((0u32..288).map(|i| {
+            let sym = match i {
+                n @ 0 ... 255 => LitLenSymbol::Byte(n as u8),
+                256 => LitLenSymbol::Eof,
+                n => LitLenSymbol::Pointer((n - 257) as u8)
+            };
+
+            let len = match i {
+                0 ... 143 => 8,
+                144 ... 255 => 9,
+                256 ... 279 => 7,
+                280 ... 287 => 8,
+                _ => unreachable!()
+            };
+
+            (sym, len)
+        }));
+
+        let dist_table = HuffmanTable::from_lengths((0 .. 32).map(|val| (val, 5)));
+
+        CompressedBlockReader {
             data: inner,
             eof: false,
-        }*/
+            lit_len_table: lit_len_table,
+            dist_table: dist_table,
+        }
     }
 
+    /// Stops decoding and returns the underlying bits reader.
     pub fn into_inner(self) -> BitRead<R> {
         self.data
     }
+
+    /// Starts reading from the block. We need to pass the data previously read from the stream
+    /// in case of a pointer in the uncompressed data.
+    pub fn with_previous_data<'a>(&'a mut self, cache: &'a [u8]) -> ReadContext<'a, R> {
+        ReadContext {
+            reader: self,
+            data_cache: cache,
+        }
+    }
 }
 
-impl<R> Read for CompressedBlockReader<R> where R: Read {
+pub struct ReadContext<'a, R: 'a> where R: Read {
+    reader: &'a mut CompressedBlockReader<R>,
+    data_cache: &'a [u8],
+}
+
+impl<'a, R: 'a> Read for ReadContext<'a, R> where R: Read {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.reader.eof {
+            return Ok(0);
+        }
+
         // number of bytes already written to `buf`
         let mut written = 0;
 
@@ -56,7 +97,7 @@ impl<R> Read for CompressedBlockReader<R> where R: Read {
             // reading a symbol from the input data
             // this symbol doesn't necessarly mean a byte, it can also be an EOF marker or a
             // pointer to a previous element of the output buffer
-            let symbol = try!(self.lit_len_table.decode(&mut self.data));
+            let symbol = try!(self.reader.lit_len_table.decode(&mut self.reader.data));
 
             match symbol {
                 LitLenSymbol::Byte(val) => {
@@ -67,18 +108,26 @@ impl<R> Read for CompressedBlockReader<R> where R: Read {
 
                 LitLenSymbol::Eof => {
                     // we reached the end of the block
+                    self.reader.eof = true;
                     return Ok(written);
                 },
 
                 LitLenSymbol::Pointer(ptr) => {
                     // this means that we need to copy some existing data
                     let length = LENGTHS[ptr as usize] +
-                                 try!(self.data.read(EXTRA_LENGTHS[ptr as usize])) as u16;
-                    let distance = try!(self.dist_table.decode(&mut self.data));
+                                 try!(self.reader.data.read(EXTRA_LENGTHS[ptr as usize])) as u16;
+                    let distance = try!(self.reader.dist_table.decode(&mut self.reader.data));
                     let distance = DISTANCES[distance as usize] +
-                                   try!(self.data.read(EXTRA_DISTANCES[distance as usize])) as u16;
+                                   try!(self.reader.data.read(EXTRA_DISTANCES[distance as usize]))
+                                   as u16;
 
-                    unimplemented!();
+                    let (src, dest) = buf.split_at_mut(written);
+                    let (nb, remaining_data) = try!(read_behind(length, distance, src,
+                                                                self.data_cache, dest));
+                    assert!(remaining_data.len() == 0);     // FIXME: 
+                    written += nb;
+
+                    // FIXME: not totally implemented, there's a repeating thingy
                 }
             }
         }
@@ -90,7 +139,7 @@ fn read_dynamic_tables<R>(inner: &mut BitRead<R>)
                           where R: Read
 {
     // the dynamic tables start with the number of elements that are following
-    let hlit = try!(inner.read(5)) + 257;
+    let hlit = try!(inner.read(5)) as u16 + 257;
     let hdist = try!(inner.read(5)) + 1;
     let hclen = try!(inner.read(4)) + 4;
 
@@ -202,6 +251,30 @@ fn read_dynamic_tables<R>(inner: &mut BitRead<R>)
     let dist_table = decode!(inner, hdist, |n: usize| n as u8);
 
     Ok((lit_len_table, dist_table))
+}
+
+/// Reads from the previous data into the destination.
+///
+/// Returns the size that was written in `dest`, plus any remaining data.
+fn read_behind(length: u16, distance: u16, immediate_cache: &[u8], previous_cache: &[u8],
+               dest: &mut [u8]) -> io::Result<(usize, Vec<u8>)>
+{
+    let mut written = 0;
+
+    // building an iterator of the input data
+    // FIXME: check overflow
+    let reader = Cursor::new(previous_cache).chain(Cursor::new(immediate_cache));
+    let mut reader = reader.bytes()
+                           .skip(previous_cache.len() + immediate_cache.len() - distance as usize)
+                           .take(length as usize)
+                           .map(|b| b.unwrap());
+
+    for (src, dest) in reader.by_ref().zip(dest.iter_mut()) {
+        *dest = src;
+        written += 1;
+    }
+
+    Ok((written, reader.collect()))
 }
 
 const LENGTHS: [u16; 29] = [

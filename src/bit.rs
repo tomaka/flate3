@@ -1,4 +1,3 @@
-use std::cmp;
 use std::io::{self, Read};
 use std::io::Error as IoError;
 

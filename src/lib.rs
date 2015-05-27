@@ -5,7 +5,6 @@ pub use zlib_decoder::ZlibDecoder;
 mod adler32;
 mod bit;
 mod compressed_block_reader;
-mod crc32;
 mod huffman;
 mod inflate;
 mod zlib_decoder;
