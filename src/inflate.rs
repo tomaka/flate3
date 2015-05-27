@@ -155,9 +155,11 @@ fn consume_block_start<R>(mut bits: BitRead<R>) -> IoResult<InflaterState<R>> wh
     match try!(bits.read(2)) {
         // dynamic huffman codes
         0b10 => {
-            // the block starts with two table definitions
-
-            unimplemented!();
+            // the block starts with two huffman table definitions
+            Ok(InflaterState::CompressedData {
+                data: try!(CompressedBlockReader::from_dynamic_tables(bits)),
+                last_block: bfinal,
+            })
         },
 
         // fixed huffman codes
@@ -248,5 +250,19 @@ mod tests {
 
         let mut output = Vec::new();
         assert!(inflater.read_to_end(&mut output).is_err());
+    }
+
+    #[test]
+    fn compressed_dynamic_block() {
+        let data = vec![0xBD, 0x48, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0x57,
+                        0x28, 0xEF, 0xBF, 0xBD, 0x2F, 0xEF, 0xBF, 0xBD, 0x49, 0x01, 0xEF, 0xBF,
+                        0xBD];
+        let mut data = Cursor::new(data);
+
+        let mut inflater = Inflater::new(data);
+
+        let mut output = Vec::new();
+        inflater.read_to_end(&mut output).unwrap();
+        assert_eq!(output, b"hello world");
     }
 }

@@ -9,6 +9,7 @@ use std::io;
 /// A huffman table. Contains the code -> symbol decoding system.
 ///
 /// The `S` corresponds to the types of symbols (ie. the result of decoding).
+#[derive(Debug, Clone)]
 pub struct HuffmanTable<S> {
     // The index of each element corresponds to the pattern that must be matched.
     // For example element `0` corresponds to the bits pattern `000000000`.
