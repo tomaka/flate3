@@ -4,6 +4,7 @@ mod adler32;
 mod bit;
 mod crc32;
 mod huffman;
+mod inflate;
 mod zlib_decoder;
 
 /// Reads in the whole buffer. If an EOF error happens, returns `InvalidInput`.

@@ -1,5 +1,6 @@
 use std::io::{ErrorKind, Read};
 use std::io::Error as IoError;
+use inflate::Inflater;
 
 /// A reader that decodes zlib data from an underlying reader.
 pub struct ZlibDecoder<R> where R: Read {
@@ -16,7 +17,7 @@ enum ZlibDecoderState<R> where R: Read {
     // we are currently reading compressed data
     CompressedData {
         // reader wrapper around the inflater
-        reader: R,
+        reader: Inflater<R>,
     },
 
     Checksum,
@@ -39,7 +40,7 @@ impl<R> Read for ZlibDecoder<R> where R: Read {
             Some(ZlibDecoderState::Start { mut reader }) => {
                 try!(consume_zlib_header(&mut reader));
                 self.state = Some(ZlibDecoderState::CompressedData {
-                    reader: reader      // FIXME: 
+                    reader: Inflater::new(reader),
                 });
                 self.read(buf)
             },

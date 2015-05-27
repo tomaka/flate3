@@ -50,6 +50,13 @@ impl<R> BitRead<R> where R: Read {
         Ok(self.read_from_cache(bits))
     }
 
+    /// Aligns to the next byte and returns the wrapper reader.
+    pub fn byte_align_unwrap(self) -> R {
+        // FIXME: incorrect
+        assert!(self.bits <= 7);
+        self.inner
+    }
+
     /// Reads a number of bits from `data`.
     ///
     /// # Panic
