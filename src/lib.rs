@@ -1,7 +1,10 @@
 use std::io::{self, Read};
 
+pub use zlib_decoder::ZlibDecoder;
+
 mod adler32;
 mod bit;
+mod compressed_block_reader;
 mod crc32;
 mod huffman;
 mod inflate;
@@ -25,8 +28,4 @@ fn read_all<R>(reader: &mut R, mut output: &mut [u8]) -> io::Result<()> where R:
             Err(e) => return Err(e),
         }
     }
-}
-
-#[test]
-fn it_works() {
 }

@@ -5,10 +5,15 @@ use std::io::Error as IoError;
 use std::io::Result as IoResult;
 
 use bit::BitRead;
+use compressed_block_reader::CompressedBlockReader;
 use huffman::HuffmanTable;
 
 /// Reads data from an underlying reader and decodes it.
 pub struct Inflater<R> where R: Read {
+    /// Since the algorithm can require us to copy previous data in the stream, we have to
+    /// keep a cache of the already decoded data.
+    output_cache: Vec<u8>,
+
     /// If this ever becomes `None`, that means an IoError occured somewhere.
     state: Option<InflaterState<R>>,
 }
@@ -35,7 +40,8 @@ enum InflaterState<R> where R: Read {
     },
 
     CompressedData {
-
+        /// The data to read from. Returns EOF at the end of the block.
+        data: CompressedBlockReader<R>,
 
         /// If true, then we have read a block header whose `bfinal` value is true, meaning that
         /// this is the last block of the stream.
@@ -53,6 +59,7 @@ impl<R> Inflater<R> where R: Read {
     /// Initializes a new inflater.
     pub fn new(inner: R) -> Inflater<R> {
         Inflater {
+            output_cache: Vec::with_capacity(32768 + 258),
             state: Some(InflaterState::BeforeBlockStart {
                 data: BitRead::new(inner)
             })
@@ -77,6 +84,10 @@ impl<R> Read for Inflater<R> where R: Read {
                     data.read(buf)
                 });
 
+                for b in &buf[..result] {
+                    self.output_cache.push(*b);
+                }
+
                 if result == 0 {
                     Err(IoError::new(ErrorKind::InvalidInput,
                                      "Unexpected EOF inside uncompressed block"))
@@ -99,8 +110,29 @@ impl<R> Read for Inflater<R> where R: Read {
                 }
             },
 
-            Some(InflaterState::CompressedData { last_block }) => {
-                unimplemented!();
+            Some(InflaterState::CompressedData { mut data, last_block }) => {
+                let result = try!(data.read(buf));
+
+                for b in &buf[..result] {
+                    self.output_cache.push(*b);
+                }
+
+                if result == 0 {
+                    if last_block {
+                        self.state = Some(InflaterState::Eof {
+                                              data: data.into_inner().byte_align_unwrap()
+                                          });
+                    } else {
+                        self.state = Some(InflaterState::BeforeBlockStart {
+                                              data: data.into_inner()
+                                          });
+                    }
+
+                    self.read(buf)
+
+                } else {
+                    Ok(result)
+                }
             },
 
             Some(InflaterState::Eof { data }) => {
