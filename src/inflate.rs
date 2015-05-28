@@ -182,8 +182,8 @@ fn consume_block_start<R>(mut bits: BitRead<R>) -> IoResult<InflaterState<R>> wh
             let mut header = [0, 0, 0, 0];
             try!(::read_all(&mut inner, &mut header));
 
-            let (len, nlen) = (((header[0] as u16) << 8) | header[1] as u16,
-                               ((header[2] as u16) << 8) | header[3] as u16);
+            let (len, nlen) = (((header[1] as u16) << 8) | header[0] as u16,
+                               ((header[3] as u16) << 8) | header[2] as u16);
 
             // nlen must len's one complement
             if nlen != !len {
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn uncompressed_block() {
-        let data = vec![0x1, 0, 5, 0xff, 0xfa, b'h', b'e', b'l', b'l', b'o'];
+        let data = vec![0x1, 5, 0, 0xfa, 0xff, b'h', b'e', b'l', b'l', b'o'];
         let data = Cursor::new(data);
 
         let mut inflater = Inflater::new(data);
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn uncompressed_block_too_short() {
-        let data = vec![0x1, 0, 5, 0xff, 0xfa, b'h', b'e', b'l'];
+        let data = vec![0x1, 5, 0, 0xfa, 0xff, b'h', b'e', b'l'];
         let data = Cursor::new(data);
 
         let mut inflater = Inflater::new(data);
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn uncompressed_block_wrong_len_nlen() {
-        let data = vec![0x1, 0, 5, 0xff, 0xfb, b'h', b'e', b'l', b'l', b'o'];
+        let data = vec![0x1, 5, 0, 0xfb, 0xff, b'h', b'e', b'l', b'l', b'o'];
         let data = Cursor::new(data);
 
         let mut inflater = Inflater::new(data);
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn uncompressed_then_compressed_fixed_block_distance() {
-        let data = vec![0x0, 0, 5, 0xff, 0xfa, b'h', b'e', b'l', b'l', b'o',
+        let data = vec![0x0, 5, 0, 0xfa, 0xff, b'h', b'e', b'l', b'l', b'o',
                         0x73, 0x49, 0x4d, 0xcb, 0x49, 0x2c, 0x49, 0x55, 0x00, 0x11, 0x00];
         let data = Cursor::new(data);
 
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn compressed_fixed_block_distance_then_uncompressed() {
         let data = vec![0x72, 0x49, 0x4d, 0xcb, 0x49, 0x2c, 0x49, 0x55, 0x00, 0x11, 0x80,
-                        0x0, 0, 5, 0xff, 0xfa, b'h', b'e', b'l', b'l', b'o'];
+                        0x0, 5, 0, 0xfa, 0xff, b'h', b'e', b'l', b'l', b'o'];
         let data = Cursor::new(data);
 
         let mut inflater = Inflater::new(data);
