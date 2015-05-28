@@ -254,4 +254,30 @@ mod tests {
         inflater.read_to_end(&mut output).unwrap();
         assert_eq!(output, b"Deflate late");
     }
+
+    #[test]
+    fn uncompressed_then_compressed_fixed_block_distance() {
+        let data = vec![0x0, 0, 5, 0xff, 0xfa, b'h', b'e', b'l', b'l', b'o',
+                        0x73, 0x49, 0x4d, 0xcb, 0x49, 0x2c, 0x49, 0x55, 0x00, 0x11, 0x00];
+        let data = Cursor::new(data);
+
+        let mut inflater = Inflater::new(data);
+
+        let mut output = Vec::new();
+        inflater.read_to_end(&mut output).unwrap();
+        assert_eq!(output, b"helloDeflate late");
+    }
+
+    #[test]
+    fn compressed_fixed_block_distance_then_uncompressed() {
+        let data = vec![0x72, 0x49, 0x4d, 0xcb, 0x49, 0x2c, 0x49, 0x55, 0x00, 0x11, 0x80,
+                        0x0, 0, 5, 0xff, 0xfa, b'h', b'e', b'l', b'l', b'o'];
+        let data = Cursor::new(data);
+
+        let mut inflater = Inflater::new(data);
+
+        let mut output = Vec::new();
+        inflater.read_to_end(&mut output).unwrap();
+        assert_eq!(output, b"Deflate latehello");
+    }
 }

@@ -45,13 +45,27 @@ impl<R> Read for ZlibDecoder<R> where R: Read {
                 self.read(buf)
             },
 
-            Some(_) => {
-                Ok(0)       // FIXME: 
+            Some(ZlibDecoderState::CompressedData { mut reader }) => {
+                let result = try!(reader.read(buf));
+
+                if result == 0 {
+                    self.state = Some(ZlibDecoderState::Checksum);
+                    self.read(buf)
+
+                } else {
+                    self.state = Some(ZlibDecoderState::CompressedData { reader: reader });
+                    Ok(result)
+                }
+            },
+
+            Some(ZlibDecoderState::Checksum) => {
+                // FIXME: check checksum
+                Ok(0)
             },
 
             None => {
-                // FIXME: 
-                panic!();
+                return Err(IoError::new(ErrorKind::InvalidInput,
+                                        "I/O errors in the inflater are unrecoverable"));
             }
         }
     }

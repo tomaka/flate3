@@ -33,6 +33,7 @@ impl<S> HuffmanTable<S> where S: Clone {
     ///
     pub fn from_lengths<I>(lengths: I) -> HuffmanTable<S> where I: IntoIterator<Item = (S, u8)> {
         let lengths = lengths.into_iter().collect::<Vec<_>>();
+        assert!(!lengths.is_empty());
 
         // array where indices are lengths and values are number of elements of that length
         let bitlen_count = {
@@ -44,7 +45,10 @@ impl<S> HuffmanTable<S> where S: Clone {
         };
 
         // finding the minimum number of bits of pattern
-        let min_bits = bitlen_count.iter().position(|&e| e != 0).unwrap() as u8;
+        let min_bits = match bitlen_count.iter().position(|&e| e != 0) {
+            Some(pos) => pos as u8,
+            None => panic!(),
+        };
         assert!(min_bits >= 1);
 
         // array where indices are lengths and values are the starting values for this length
