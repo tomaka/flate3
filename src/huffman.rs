@@ -29,7 +29,7 @@ impl<S> HuffmanTable<S> where S: Clone {
     ///
     /// # Panic
     ///
-    /// Panics if one of the lengths is strictly superior to 9 or equal to 0.
+    /// Panics if one of the lengths is strictly superior to 15 or equal to 0.
     ///
     pub fn from_lengths<I>(lengths: I) -> HuffmanTable<S> where I: IntoIterator<Item = (S, u8)> {
         let lengths = lengths.into_iter().collect::<Vec<_>>();
@@ -37,8 +37,9 @@ impl<S> HuffmanTable<S> where S: Clone {
 
         // array where indices are lengths and values are number of elements of that length
         let bitlen_count = {
-            let mut bl = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let mut bl = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
             for &(_, len) in &lengths {
+                assert!(len <= 15);
                 bl[len as usize] += 1;
             }
             bl
@@ -54,7 +55,7 @@ impl<S> HuffmanTable<S> where S: Clone {
         // array where indices are lengths and values are the starting values for this length
         let mut next_code = {
             let mut code = 0;
-            let mut next_code = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let mut next_code = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
             for bit in (1 .. next_code.len()) {
                 code = (code + bitlen_count[bit - 1]) << 1;
                 next_code[bit] = code;
