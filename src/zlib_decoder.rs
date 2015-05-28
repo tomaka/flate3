@@ -105,3 +105,23 @@ fn consume_zlib_header<R>(reader: &mut R) -> Result<(), IoError> where R: Read {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ZlibDecoder;
+    use std::io::Cursor;
+    use std::io::Read;
+
+    #[test]
+    fn hello_world() {
+        let data = vec![0x78, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca,
+                        0x49, 0x01, 0x00, 0x1a, 0x0b, 0x04, 0x5d];
+        let data = Cursor::new(data);
+
+        let mut inflater = ZlibDecoder::new(data);
+
+        let mut output = Vec::new();
+        inflater.read_to_end(&mut output).unwrap();
+        assert_eq!(output, b"hello world");
+    }
+}

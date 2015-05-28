@@ -71,7 +71,6 @@ impl<R> BitRead<R> where R: Read {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -88,6 +87,21 @@ mod tests {
         assert_eq!(data.read(3).unwrap(), 0b001);
         assert_eq!(data.read(3).unwrap(), 0b100);
         assert_eq!(data.read(4).unwrap(), 0b1101);
+    }
+
+    #[test]
+    fn bit_by_bit() {
+        let data = Cursor::new(vec![0b01001110]);
+        let mut data = BitRead::new(data);
+
+        assert_eq!(data.read(1).unwrap(), 0b0);
+        assert_eq!(data.read(1).unwrap(), 0b1);
+        assert_eq!(data.read(1).unwrap(), 0b1);
+        assert_eq!(data.read(1).unwrap(), 0b1);
+        assert_eq!(data.read(1).unwrap(), 0b0);
+        assert_eq!(data.read(1).unwrap(), 0b0);
+        assert_eq!(data.read(1).unwrap(), 0b1);
+        assert_eq!(data.read(1).unwrap(), 0b0);
     }
 
     #[test]
