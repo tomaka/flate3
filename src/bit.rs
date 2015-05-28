@@ -49,6 +49,16 @@ impl<R> BitRead<R> where R: Read {
         Ok(self.read_from_cache(bits))
     }
 
+    ///
+    pub fn read_bit_per_bit(&mut self, bits: u8) -> Result<u8, IoError> {
+        let mut buffer = 0;
+        for _ in (0 .. bits) {
+            buffer <<= 1;
+            buffer |= try!(self.read(1));
+        }
+        Ok(buffer)
+    }
+
     /// Aligns to the next byte and returns the wrapper reader.
     pub fn byte_align_unwrap(self) -> R {
         debug_assert!(self.bits <= 7);
